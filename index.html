@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Boffetada Libre · Contador</title>
+<title>Buffetada Libre · Contador</title>
 <style>
 :root{--bg:#f4f5f0;--card:#fff;--ink:#16221f;--mut:#5d6b67;--line:#d9ddd6;--acc:#0f5c54;--onacc:#fff;--warn:#c2410c;--gold:#e8b030;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101a18;--card:#182623;--ink:#eef2ee;--mut:#9fb0aa;--line:#2b3d39;--acc:#4fc1b0;--onacc:#06201c;--warn:#fb923c;--gold:#f0c24a}}
@@ -20,7 +20,10 @@ h1{font-size:26px;margin:0;font-weight:800;letter-spacing:-.5px}
 .round{font-size:15px;color:var(--mut)}
 .tools{display:flex;gap:8px;flex-wrap:wrap}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
-.p{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.p{background:var(--card);border:1px solid var(--line);border-top:8px solid var(--pc,var(--acc));border-radius:14px;padding:14px}
+.chips button{border-color:var(--pc,var(--line))}
+.end{background:var(--gold);color:#1b1b1b;border-radius:14px;padding:12px 16px;margin-bottom:12px}.end h2{margin:0 0 4px}.end p{margin:2px 0}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}
 .p.out{opacity:.78;border-style:dashed}
 .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .name{font-weight:600;font-size:18px;background:transparent;border:0;border-bottom:1px dashed var(--line);color:inherit;width:60%;padding:2px 0}
@@ -57,6 +60,7 @@ input[type=number],.setup input[type=text]{font:inherit;padding:10px;border:1px 
 <div id="modal"><div id="box" role="dialog" aria-modal="true"><h2 id="mt"></h2><div id="opts"></div><button id="mc" class="sec" style="width:100%">Cancelar</button></div></div>
 <script>
 const KEY="boffetada-v1",CHIPS=[10,20,30,40,50,60,70,80,90,100];
+const COL=["#e5484d","#3e8ef7","#2fa66a","#f0a020","#9b59d0","#e8589a","#14b8c4","#8a6a4a"];
 let S=null,H=[];
 try{const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
 const $=s=>document.querySelector(s);
@@ -75,7 +79,7 @@ function start(n){
   S={round:1,players:names.map(x=>({name:x,money:m,spent:0,out:false}))};H=[];save();render()}
 function setup(){
   const n=+(window._n||4);
-  $("#app").innerHTML=`<div class="setup"><h1>Boffetada Libre</h1><p class="hint">Contador de presupuestos. Sin bloc de papel.</p>
+  $("#app").innerHTML=`<div class="setup"><h1>Buffetada Libre</h1><p class="hint">Contador de presupuestos. Sin bloc de papel.</p>
   <label>Jugadores</label><div class="row">${[3,4,5,6,7,8].map(k=>`<button data-k="${k}" class="${k==n?"on":""}">${k}</button>`).join("")}</div>
   <label>Presupuesto por jugador (€)</label><input id="budget" type="number" inputmode="numeric" value="${250*n}" step="50">
   <p class="hint">Sugerido: 250 € por jugador.</p>
@@ -95,23 +99,25 @@ async function act(i,a,v){
 }
 async function closeBuffet(){
   const r=await pick("¿Cerrar el buffet y cobrar las cuentas?",[{l:"Sí, cobrar",v:1}]);if(!r)return;
-  mut(()=>{S.players.forEach(p=>{p.money-=p.spent;p.spent=0;p.out=false});S.round++})}
+  mut(()=>{S.players.forEach(p=>{p.money-=p.spent;p.spent=0;p.out=false});S.round++;if(S.players.some(p=>p.money<=0))S.over=true})}
 async function reset(){const r=await pick("¿Empezar una partida nueva? Se borra la actual.",[{l:"Sí, nueva partida",v:1}]);if(r){S=null;H=[];try{localStorage.removeItem(KEY)}catch(e){}render()}}
 function render(){
   if(!S)return setup();
-  const rank=[...S.players].sort((a,b)=>b.money-a.money);
-  const broke=S.players.filter(p=>p.money<=0);
-  $("#app").innerHTML=`<header><div><h1>Boffetada Libre</h1><div class="round">Buffet nº ${S.round}</div></div>
+  const rank=S.players.map((p,i)=>({...p,i})).sort((a,b)=>b.money-a.money);
+  const mx=Math.max(...S.players.map(p=>p.money)),win=S.players.filter(p=>p.money==mx).map(p=>p.name).join(" y "),lose=S.players.filter(p=>p.money<=0).map(p=>p.name).join(" y ");
+  const endBox=S.over?`<div class="end"><h2>Fin de partida</h2><p>Gana <b>${win}</b> con ${eur(mx)}.</p><p>Pierde <b>${lose}</b>, que se ha quedado a 0 €.</p></div>`:"";
+  $("#app").innerHTML=`<header><div><h1>Buffetada Libre</h1><div class="round">Buffet nº ${S.round}</div></div>
   <div class="tools"><button class="sec" id="u" ${H.length?"":"disabled"}>Deshacer</button><button class="pri" id="cb">Cerrar buffet</button><button class="sec" id="rs">Nueva</button></div></header>
-  ${broke.length?`<p class="tag" style="display:inline-block">Alguien se ha quedado sin dinero. Gana quien más conserve.</p>`:""}
-  <div class="grid">${S.players.map((p,i)=>`<div class="p ${p.out?"out":""}">
+  ${endBox}
+  <div class="grid">${S.players.map((p,i)=>`<div class="p ${p.out?"out":""}" style="--pc:${COL[i%8]}">
     <div class="top"><input class="name" data-i="${i}" value="${p.name.replace(/"/g,"&quot;")}" aria-label="Nombre">${p.out?'<span class="tag">Plantado</span>':""}</div>
     <div class="nums"><div><small>Dinero</small><span class="num ${p.money<=0?"neg":""}">${eur(p.money)}</span></div>
     <div><small>Cuenta</small><span class="num">${eur(p.spent)}</span></div>
     <div><small>Quedaría</small><span class="num ${p.money-p.spent<0?"neg":""}">${eur(p.money-p.spent)}</span></div></div>
     <div class="chips">${CHIPS.map(c=>`<button data-i="${i}" data-a="add" data-v="${c}">+${c}</button>`).join("")}</div>
     <div class="acts"><button data-i="${i}" data-a="plant">${p.out?"Volver":"Plantarse"}</button><button data-i="${i}" data-a="sinpa">Sinpa</button><button data-i="${i}" data-a="bizum">Bizum</button><button data-i="${i}" data-a="prueba">Prueba esto</button><button data-i="${i}" data-a="indi">Indigestión</button></div></div>`).join("")}</div>
-  <section><h2>Clasificación</h2><div class="rank">${rank.map((p,k)=>`<div><span>${k+1}. ${p.name}</span><b class="${p.money<=0?"neg":""}">${eur(p.money)}</b></div>`).join("")}</div></section>`;
+  <section><h2>Clasificación</h2><div class="rank">${rank.map((p,k)=>`<div><span><i class="dot" style="background:${COL[p.i%8]}"></i>${k+1}. ${p.name}</span><b class="${p.money<=0?"neg":""}">${eur(p.money)}</b></div>`).join("")}</div></section>`;
+  if(S.over){document.querySelectorAll("button[data-a]").forEach(b=>b.disabled=true);$("#cb").disabled=true}
   $("#u").onclick=undo;$("#cb").onclick=closeBuffet;$("#rs").onclick=reset;
   document.querySelectorAll("button[data-a]").forEach(b=>b.onclick=()=>act(+b.dataset.i,b.dataset.a,+b.dataset.v));
   document.querySelectorAll("input.name").forEach(e=>e.onchange=()=>{S.players[+e.dataset.i].name=e.value.trim()||"Jugador";save();render()})}
